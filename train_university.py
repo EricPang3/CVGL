@@ -31,12 +31,12 @@ class Configuration:
     custom_sampling: bool = True         # use custom sampling instead of random
     seed = 1
     epochs: int = 1
-    batch_size: int = 128                # keep in mind real_batch_size = 2 * batch_size
+    batch_size: int = 32                 # keep in mind real_batch_size = 2 * batch_size
     verbose: bool = True
-    gpu_ids: tuple = (0,1,2,3)           # GPU ids for training
+    gpu_ids: tuple = (0,)                # GPU ids for training
     
     # Eval
-    batch_size_eval: int = 128
+    batch_size_eval: int = 64
     eval_every_n_epoch: int = 1          # eval every n Epoch
     normalize_features: bool = True
     eval_gallery_n: int = -1             # -1 for all or int
@@ -44,7 +44,7 @@ class Configuration:
     # Optimizer 
     clip_grad = 100.                     # None | float
     decay_exclue_bias: bool = False
-    grad_checkpointing: bool = False     # Gradient Checkpointing
+    grad_checkpointing: bool = True      # Gradient Checkpointing
     
     # Loss
     label_smoothing: float = 0.1
@@ -72,7 +72,7 @@ class Configuration:
     checkpoint_start = None
   
     # set num_workers to 0 if on Windows
-    num_workers: int = 0 if os.name == 'nt' else 4 
+    num_workers: int = 0 if os.name == 'nt' else 8 
     
     # train on GPU if available
     device: str = 'cuda' if torch.cuda.is_available() else 'cpu' 
