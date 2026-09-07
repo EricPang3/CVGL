@@ -1,5 +1,6 @@
 import os
 import time
+import csv
 import shutil
 import sys
 import gc
@@ -35,12 +36,9 @@ class Configuration:
     mixed_precision: bool = True
     custom_sampling: bool = True         # use custom sampling instead of random
     seed = 1
-    # Epochs 说明：默认 1 与 train_university.py 相同（仓库用它做快速验证/调试）。
-    # SUES-200 单高度每 epoch 只有约 187 步（120 地点 x 50 图 / batch 32），1 epoch 远远不够：
-    #   - 仓库其它数据集默认：CVUSA/CVACT/VIGOR = 40
-    #   - 官方 SUES-200-Benchmark：60（MultiStepLR [20,40]）
-    #   - 建议：先用 epochs=1 验证管线，正式训练设 40~80（例如 40）
-    epochs: int = 1
+    # Epochs 说明：默认 40。SUES-200 单高度每 epoch 约 187 步（120 地点 x 50 图 / batch 32），
+    # 1 epoch 远远不够：仓库 CVUSA/CVACT/VIGOR 默认 40，官方 SUES-200-Benchmark 用 60。
+    epochs: int = 40
     batch_size: int = 32                 # keep in mind real_batch_size = 2 * batch_size
     verbose: bool = True
     gpu_ids: tuple = (0,)                # GPU ids for training
@@ -67,8 +65,8 @@ class Configuration:
 
     # Dataset
     dataset: str = 'SUES200-D2S'         # 'SUES200-D2S' (drone -> satellite) | 'SUES200-S2D' (satellite -> drone)
-    altitudes: list = field(default_factory=lambda: [150, 200, 250, 300])  # train & evaluate one model per
-                                           # altitude (official protocol); results are saved separately per altitude
+    altitudes: list = field(default_factory=lambda: [150])  # only the 150 m altitude (lowest flight height,
+                                           # i.e. the hardest setting); other options: 150/200/250/300
     data_folder: str = "./data/SUES200"          # same convention as the other datasets in this repo
     split_file: str = None               # None -> official 120/80 split | path to txt (one place id per line)
     eval_gallery_mode: str = 'all'       # 'all' -> official protocol (gallery = 200 places) | 'test' -> gallery = 80 test places
@@ -348,6 +346,12 @@ def run_altitude(altitude, train_places, test_places):
     best_score = 0
     best_metrics = None
 
+    # per-epoch record: training loss, Recall@1 and AP (one row per epoch)
+    epoch_log_path = os.path.join(model_path, 'epoch_log.csv')
+    epoch_log = open(epoch_log_path, 'w', newline='')
+    epoch_writer = csv.writer(epoch_log)
+    epoch_writer.writerow(['epoch', 'train_loss', 'Recall@1', 'AP'])
+
     for epoch in range(1, config.epochs+1):
 
         print("\n{}[Epoch: {}]{}".format(30*"-", epoch, 30*"-"))
@@ -365,6 +369,8 @@ def run_altitude(altitude, train_places, test_places):
                                                                    optimizer.param_groups[0]['lr']))
 
         # evaluate
+        r1_epoch = ''
+        ap_epoch = ''
         if (epoch % config.eval_every_n_epoch == 0 and epoch != 0) or epoch == config.epochs:
 
             print("\n{}[{}]{}".format(30*"-", "Evaluate", 30*"-"))
@@ -378,6 +384,9 @@ def run_altitude(altitude, train_places, test_places):
                                         cleanup=True,
                                         return_metrics=True)
 
+            r1_epoch = metrics['Recall@1']
+            ap_epoch = metrics['AP']
+
             if r1_test > best_score:
 
                 best_score = r1_test
@@ -388,8 +397,14 @@ def run_altitude(altitude, train_places, test_places):
                 else:
                     torch.save(model.state_dict(), '{}/weights_e{}_{:.4f}.pth'.format(model_path, epoch, r1_test))
 
+        # write one row per epoch: train loss, Recall@1 and AP
+        epoch_writer.writerow([epoch, '{:.6f}'.format(train_loss), r1_epoch, ap_epoch])
+        epoch_log.flush()
+
         if config.custom_sampling:
             train_dataloader.dataset.shuffle()
+
+    epoch_log.close()
 
     if torch.cuda.device_count() > 1 and len(config.gpu_ids) > 1:
         torch.save(model.module.state_dict(), '{}/weights_end.pth'.format(model_path))
