@@ -20,72 +20,72 @@ from sample4geo.model import TimmModel
 @dataclass
 class Configuration:
     
-    # Model
+    # 模型
     model: str = 'convnext_base.fb_in22k_ft_in1k_384'
     
-    # Override model image size
+    # 模型的输入图像尺寸
     img_size: int = 384
     
-    # Training 
-    mixed_precision: bool = True
-    custom_sampling: bool = True         # use custom sampling instead of random
+    # 训练 
+    mixed_precision: bool = True         # 混合精度
+    custom_sampling: bool = True         # 自定义采样，保证同一批次地点编号不重复
     seed = 1
     epochs: int = 1
-    batch_size: int = 128                # keep in mind real_batch_size = 2 * batch_size
-    verbose: bool = True
-    gpu_ids: tuple = (0,1,2,3)           # GPU ids for training
+    batch_size: int = 128                # 注意实际批量大小 real_batch_size = 2 * batch_size
+    verbose: bool = True                 # 开启详细输出，False 时会关闭显示
+    gpu_ids: tuple = (0,1,2,3)           # 用于训练的 GPU 编号
     
-    # Eval
+    # 评估
     batch_size_eval: int = 128
-    eval_every_n_epoch: int = 1          # eval every n Epoch
-    normalize_features: bool = True
-    eval_gallery_n: int = -1             # -1 for all or int
+    eval_every_n_epoch: int = 1          # 每隔 n 个训练轮次进行一次评估
+    normalize_features: bool = True      # 是否对特征进行归一化
+    eval_gallery_n: int = -1             # -1 表示使用全部图像，也可指定整数数量
 
-    # Optimizer 
-    clip_grad = 100.                     # None | float
-    decay_exclue_bias: bool = False
-    grad_checkpointing: bool = False     # Gradient Checkpointing
+    # 优化器 
+    clip_grad = 100.                     # 梯度裁剪阈值，不裁剪时设为 None，否则设为浮点数阈值
+    decay_exclue_bias: bool = False      # 是否在权重衰减时排除偏置参数
+    grad_checkpointing: bool = False     # 梯度检查点：是否用额外计算换更少显存占用
     
-    # Loss
-    label_smoothing: float = 0.1
+    # 损失函数
+    label_smoothing: float = 0.1         # 标签平滑：将部分概率分配给其他类别，避免过拟合和提高模型的泛化能力。设置为 0 表示不使用标签平滑。
     
-    # Learning Rate
-    lr: float = 0.001                    # 1 * 10^-4 for ViT | 1 * 10^-1 for CNN
-    scheduler: str = "cosine"           # "polynomial" | "cosine" | "constant" | None
+    # 学习率
+    lr: float = 0.001                    # ViT 使用 1 * 10^-4，CNN 使用 1 * 10^-1
+    scheduler: str = "cosine"            # 可选多项式衰减（"polynomial"）、余弦衰减（"cosine"）、恒定学习率（"constant"）或 None
     warmup_epochs: int = 0.1
-    lr_end: float = 0.0001               #  only for "polynomial"
+    lr_end: float = 0.0001               #  仅用于多项式衰减（"polynomial"）
     
-    # Dataset
-    dataset: str = 'U1652-D2S'           # 'U1652-D2S' | 'U1652-S2D'
-    data_folder: str = "./data/U1652"
+    # 数据集
+    dataset: str = 'U1652-D2S'           # 任务方向，可选 'U1652-D2S'（无人机到卫星）或 'U1652-S2D'（卫星到无人机）
+    data_folder: str = "./data/U1652"    # 数据集路径
     
-    # Augment Images
-    prob_flip: float = 0.5              # flipping the sat image and drone image simultaneously
+    # 图像增强
+    prob_flip: float = 0.5              # 同时水平翻转卫星图像和无人机图像的概率
     
-    # Savepath for model checkpoints
+    # 模型权重的保存路径
     model_path: str = "./university"
     
-    # Eval before training
+    # 训练前进行评估
     zero_shot: bool = False
     
-    # Checkpoint to start from
+    # 初始权重路径
     checkpoint_start = None
   
-    # set num_workers to 0 if on Windows
+    # 在 Windows 系统上将 num_workers 设为 0
     num_workers: int = 0 if os.name == 'nt' else 4 
     
-    # train on GPU if available
+    # 如果 GPU 可用，则使用 GPU
     device: str = 'cuda' if torch.cuda.is_available() else 'cpu' 
     
-    # for better performance
+    # 提高运行性能
     cudnn_benchmark: bool = True
     
-    # make cudnn deterministic
+    # 使 cuDNN 使用确定性算法
     cudnn_deterministic: bool = False
 
 
 #-----------------------------------------------------------------------------#
-# Train Config                                                                #
+# 训练配置                                                                #
 #-----------------------------------------------------------------------------#
 
 config = Configuration() 
@@ -112,7 +112,7 @@ if __name__ == '__main__':
         os.makedirs(model_path)
     shutil.copyfile(os.path.basename(__file__), "{}/train.py".format(model_path))
 
-    # Redirect print to both console and log file
+    # 将打印输出同时写入控制台和日志文件
     sys.stdout = Logger(os.path.join(model_path, 'log.txt'))
 
     setup_system(seed=config.seed,
@@ -120,7 +120,7 @@ if __name__ == '__main__':
                  cudnn_deterministic=config.cudnn_deterministic)
 
     #-----------------------------------------------------------------------------#
-    # Model                                                                       #
+    # 模型                                                                       #
     #-----------------------------------------------------------------------------#
         
     print("\nModel: {}".format(config.model))
@@ -136,22 +136,22 @@ if __name__ == '__main__':
     std = data_config["std"]
     img_size = (config.img_size, config.img_size)
     
-    # Activate gradient checkpointing
+    # 启用梯度检查点以节省显存
     if config.grad_checkpointing:
         model.set_grad_checkpointing(True)
     
-    # Load pretrained Checkpoint    
+    # 加载已有的模型权重   
     if config.checkpoint_start is not None:  
         print("Start from:", config.checkpoint_start)
         model_state_dict = torch.load(config.checkpoint_start)  
         model.load_state_dict(model_state_dict, strict=False)     
 
-    # Data parallel
+    # 数据并行多GPU训练
     print("GPUs available:", torch.cuda.device_count())  
     if torch.cuda.device_count() > 1 and len(config.gpu_ids) > 1:
         model = torch.nn.DataParallel(model, device_ids=config.gpu_ids)
             
-    # Model to device   
+    # 将模型移至指定设备   
     model = model.to(config.device)
 
     print("\nImage Size Query:", img_size)
@@ -161,13 +161,13 @@ if __name__ == '__main__':
 
 
     #-----------------------------------------------------------------------------#
-    # DataLoader                                                                  #
+    # 数据加载器                                                                  #
     #-----------------------------------------------------------------------------#
 
-    # Transforms
+    # 图像预处理和增强
     val_transforms, train_sat_transforms, train_drone_transforms = get_transforms(img_size, mean=mean, std=std)
                                                                                                                                  
-    # Train
+    # 训练
     train_dataset = U1652DatasetTrain(query_folder=config.query_folder_train,
                                       gallery_folder=config.gallery_folder_train,
                                       transforms_query=train_sat_transforms,
@@ -182,7 +182,7 @@ if __name__ == '__main__':
                                   shuffle=not config.custom_sampling,
                                   pin_memory=True)
     
-    # Reference Satellite Images
+    # 卫星参考图像
     query_dataset_test = U1652DatasetEval(data_folder=config.query_folder_test,
                                                mode="query",
                                                transforms=val_transforms,
@@ -194,7 +194,7 @@ if __name__ == '__main__':
                                        shuffle=False,
                                        pin_memory=True)
     
-    # Query Ground Images Test
+    # 地面查询图像测试
     gallery_dataset_test = U1652DatasetEval(data_folder=config.gallery_folder_test,
                                                mode="gallery",
                                                transforms=val_transforms,
@@ -212,7 +212,7 @@ if __name__ == '__main__':
     print("Gallery Images Test:", len(gallery_dataset_test))
     
     #-----------------------------------------------------------------------------#
-    # Loss                                                                        #
+    # 损失函数                                                                        #
     #-----------------------------------------------------------------------------#
 
     loss_fn = torch.nn.CrossEntropyLoss(label_smoothing=config.label_smoothing)
@@ -226,7 +226,7 @@ if __name__ == '__main__':
         scaler = None
         
     #-----------------------------------------------------------------------------#
-    # optimizer                                                                   #
+    # 优化器                                                                   #
     #-----------------------------------------------------------------------------#
 
     if config.decay_exclue_bias:
@@ -248,7 +248,7 @@ if __name__ == '__main__':
 
 
     #-----------------------------------------------------------------------------#
-    # Scheduler                                                                   #
+    # 学习率调度器                                                                   #
     #-----------------------------------------------------------------------------#
 
     train_steps = len(train_dataloader) * config.epochs
@@ -281,7 +281,7 @@ if __name__ == '__main__':
         
         
     #-----------------------------------------------------------------------------#
-    # Zero Shot                                                                   #
+    # 零样本评估                                                                   #
     #-----------------------------------------------------------------------------#
     if config.zero_shot:
         print("\n{}[{}]{}".format(30*"-", "Zero Shot", 30*"-"))  
@@ -295,13 +295,13 @@ if __name__ == '__main__':
                            cleanup=True)
                 
     #-----------------------------------------------------------------------------#
-    # Shuffle                                                                     #
+    # 打乱数据顺序                                                                     #
     #-----------------------------------------------------------------------------#            
     if config.custom_sampling:
         train_dataloader.dataset.shuffle()
             
     #-----------------------------------------------------------------------------#
-    # Train                                                                       #
+    # 训练                                                                       #
     #-----------------------------------------------------------------------------#
     start_epoch = 0   
     best_score = 0
@@ -324,7 +324,7 @@ if __name__ == '__main__':
                                                                    train_loss,
                                                                    optimizer.param_groups[0]['lr']))
         
-        # evaluate
+        # 评估
         if (epoch % config.eval_every_n_epoch == 0 and epoch != 0) or epoch == config.epochs:
         
             print("\n{}[{}]{}".format(30*"-", "Evaluate", 30*"-"))

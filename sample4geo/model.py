@@ -16,7 +16,7 @@ class TimmModel(nn.Module):
         self.img_size = img_size
         
         if "vit" in model_name:
-            # automatically change interpolate pos-encoding to img_size
+            # 自动通过插值将位置编码调整到 img_size 对应的尺寸
             self.model = timm.create_model(model_name, pretrained=pretrained, num_classes=0, img_size=img_size) 
         else:
             self.model = timm.create_model(model_name, pretrained=pretrained, num_classes=0)

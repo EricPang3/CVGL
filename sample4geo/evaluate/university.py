@@ -34,9 +34,9 @@ def evaluate(config,
     AP = ap/len(ids_query)*100
     
     CMC = CMC.float()
-    CMC = CMC/len(ids_query) #average CMC
+    CMC = CMC/len(ids_query) #计算平均累积匹配曲线（CMC）
     
-    # top 1%
+    # 前 1% 的检索结果
     top1 = round(len(ids_gallery)*0.01)
     
     string = []
@@ -49,11 +49,11 @@ def evaluate(config,
         
     print(' - '.join(string)) 
     
-    # cleanup and free memory on GPU
+    # 清理变量并释放 GPU 内存
     if cleanup:
         del img_features_query, ids_query, img_features_gallery, ids_gallery
         gc.collect()
-        #torch.cuda.empty_cache()
+        #torch.cuda.empty_cache()  # 清空 CUDA 缓存（已禁用）
     
     return CMC[0]
 
@@ -64,15 +64,15 @@ def eval_query(qf,ql,gf,gl):
     
     score = score.squeeze().cpu().numpy()
  
-    # predict index
-    index = np.argsort(score)  #from small to large
+    # 按预测分数排列索引
+    index = np.argsort(score)  #从小到大排序
     index = index[::-1]    
 
-    # good index
+    # 正确匹配的索引
     query_index = np.argwhere(gl==ql)
     good_index = query_index
 
-    # junk index
+    # 无效样本的索引
     junk_index = np.argwhere(gl==-1)
     
     
@@ -84,15 +84,15 @@ def eval_query(qf,ql,gf,gl):
 def compute_mAP(index, good_index, junk_index):
     ap = 0
     cmc = torch.IntTensor(len(index)).zero_()
-    if good_index.size==0:   # if empty
+    if good_index.size==0:   # 如果没有正确匹配的样本
         cmc[0] = -1
         return ap,cmc
 
-    # remove junk_index
+    # 移除无效样本索引 junk_index
     mask = np.in1d(index, junk_index, invert=True)
     index = index[mask]
 
-    # find good_index index
+    # 查找正确匹配索引 good_index 在排序结果中的位置
     ngood = len(good_index)
     mask = np.in1d(index, good_index)
     rows_good = np.argwhere(mask==True)

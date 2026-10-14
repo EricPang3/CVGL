@@ -9,7 +9,7 @@ from datetime import timedelta
 
 class AverageMeter:
     """
-    Computes and stores the average and current value
+    计算并保存平均值和当前值
     """
 
     def __init__(self):
@@ -32,15 +32,15 @@ class AverageMeter:
 
 def setup_system(seed, cudnn_benchmark=True, cudnn_deterministic=True) -> None:
     '''
-    Set seeds for for reproducible training
+    设置随机种子，使训练可复现
     '''
-    # python
+    # 设置 Python 随机种子
     random.seed(seed)
     
-    # numpy
+    # 设置 NumPy 随机种子
     np.random.seed(seed)
     
-    # pytorch
+    # 设置 PyTorch 随机种子
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     if torch.cuda.is_available():

@@ -34,7 +34,7 @@ class U1652DatasetTrain(Dataset):
         self.query_dict = get_data(query_folder)
         self.gallery_dict = get_data(gallery_folder)
         
-        # use only folders that exists for both gallery and query
+        # 仅使用查询集和图库中都存在的文件夹
         self.ids = list(set(self.query_dict.keys()).intersection(self.gallery_dict.keys()))
         self.ids.sort()
         
@@ -62,7 +62,7 @@ class U1652DatasetTrain(Dataset):
         
         idx, query_img_path, gallery_img_path = self.samples[index]
         
-        # for query there is only one file in folder
+        # 查询图像的文件夹中仅有一个文件
         query_img = cv2.imread(query_img_path)
         query_img = cv2.cvtColor(query_img, cv2.COLOR_BGR2RGB)
         
@@ -74,7 +74,7 @@ class U1652DatasetTrain(Dataset):
             query_img = cv2.flip(query_img, 1)
             gallery_img = cv2.flip(gallery_img, 1) 
         
-        # image transforms
+        # 图像变换
         if self.transforms_query is not None:
             query_img = self.transforms_query(image=query_img)['image']
             
@@ -90,29 +90,29 @@ class U1652DatasetTrain(Dataset):
     def shuffle(self, ):
 
             '''
-            custom shuffle function for unique class_id sampling in batch
+            自定义打乱函数，确保每个批次中的类别编号互不重复
             '''
             
             print("\nShuffle Dataset:")
             
             pair_pool = copy.deepcopy(self.pairs)
               
-            # Shuffle pairs order
+            # 打乱图像对的顺序
             random.shuffle(pair_pool)
            
             
-            # Lookup if already used in epoch
+            # 记录当前训练轮次中已使用的图像对
             pairs_epoch = set()   
             idx_batch = set()
      
-            # buckets
+            # 用于存放批次的容器
             batches = []
             current_batch = []
              
-            # counter
+            # 计数器
             break_counter = 0
             
-            # progressbar
+            # 进度条
             pbar = tqdm()
     
             while True:
@@ -133,7 +133,7 @@ class U1652DatasetTrain(Dataset):
                         break_counter = 0
                         
                     else:
-                        # if pair fits not in batch and is not already used in epoch -> back to pool
+                        # 如果图像对无法加入当前批次，且本轮尚未使用，则将其放回候选池
                         if pair not in pairs_epoch:
                             pair_pool.append(pair)
                             
@@ -147,14 +147,14 @@ class U1652DatasetTrain(Dataset):
 
                 if len(current_batch) >= self.shuffle_batch_size:
                 
-                    # empty current_batch bucket to batches
+                    # 将当前批次中的图像对加入批次列表
                     batches.extend(current_batch)
                     idx_batch = set()
                     current_batch = []
        
             pbar.close()
             
-            # wait before closing progress bar
+            # 关闭进度条前稍作等待
             time.sleep(0.3)
             
             self.samples = batches
@@ -179,7 +179,7 @@ class U1652DatasetEval(Dataset):
 
         self.data_dict = get_data(data_folder)
 
-        # use only folders that exists for both gallery and query
+        # 仅使用查询集和图库中都存在的文件夹
         self.ids = list(self.data_dict.keys())
                 
         self.transforms = transforms
@@ -217,20 +217,20 @@ class U1652DatasetEval(Dataset):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         
         
-        #if self.mode == "sat":
+        #if self.mode == "sat":  # 判断是否为卫星图像模式（已禁用）
         
-        #    img90 = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
-        #    img180 = cv2.rotate(img90, cv2.ROTATE_90_CLOCKWISE)
-        #    img270 = cv2.rotate(img180, cv2.ROTATE_90_CLOCKWISE)
+        #    img90 = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)  # 顺时针旋转 90 度（已禁用）
+        #    img180 = cv2.rotate(img90, cv2.ROTATE_90_CLOCKWISE)  # 继续旋转至 180 度（已禁用）
+        #    img270 = cv2.rotate(img180, cv2.ROTATE_90_CLOCKWISE)  # 继续旋转至 270 度（已禁用）
             
-        #    img_0_90 = np.concatenate([img, img90], axis=1)
-        #    img_180_270 = np.concatenate([img180, img270], axis=1)
+        #    img_0_90 = np.concatenate([img, img90], axis=1)  # 水平拼接原图与 90 度旋转图（已禁用）
+        #    img_180_270 = np.concatenate([img180, img270], axis=1)  # 水平拼接 180 度与 270 度旋转图（已禁用）
             
-        #    img = np.concatenate([img_0_90, img_180_270], axis=0)
+        #    img = np.concatenate([img_0_90, img_180_270], axis=0)  # 垂直拼接两行图像（已禁用）
             
         
         
-        # image transforms
+        # 图像变换
         if self.transforms is not None:
             img = self.transforms(image=img)['image']
             

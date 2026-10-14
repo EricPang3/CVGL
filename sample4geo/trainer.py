@@ -7,15 +7,15 @@ import torch.nn.functional as F
 
 def train(train_config, model, dataloader, loss_function, optimizer, scheduler=None, scaler=None):
 
-    # set model train mode
+    # 将模型设为训练模式
     model.train()
     
     losses = AverageMeter()
     
-    # wait before starting progress bar
+    # 启动进度条前稍作等待
     time.sleep(0.1)
     
-    # Zero gradients for first step
+    # 在第一步之前清空梯度
     optimizer.zero_grad(set_to_none=True)
     
     step = 1
@@ -25,17 +25,17 @@ def train(train_config, model, dataloader, loss_function, optimizer, scheduler=N
     else:
         bar = dataloader
     
-    # for loop over one epoch
+    # 遍历一个训练轮次中的所有批次
     for query, reference, ids in bar:
         
         if scaler:
             with autocast():
             
-                # data (batches) to device   
+                # 将批次数据移至指定设备   
                 query = query.to(train_config.device)
                 reference = reference.to(train_config.device)
             
-                # Forward pass
+                # 前向传播
                 features1, features2 = model(query, reference)
                 if torch.cuda.device_count() > 1 and len(train_config.gpu_ids) > 1: 
                     loss = loss_function(features1, features2, model.module.logit_scale.exp())
@@ -46,29 +46,29 @@ def train(train_config, model, dataloader, loss_function, optimizer, scheduler=N
                   
             scaler.scale(loss).backward()
             
-            # Gradient clipping 
+            # 梯度裁剪 
             if train_config.clip_grad:
                 scaler.unscale_(optimizer)
                 torch.nn.utils.clip_grad_value_(model.parameters(), train_config.clip_grad) 
             
-            # Update model parameters (weights)
+            # 更新模型参数（权重）
             scaler.step(optimizer)
             scaler.update()
 
-            # Zero gradients for next step
+            # 清空梯度，为下一步做准备
             optimizer.zero_grad()
             
-            # Scheduler
+            # 学习率调度器
             if train_config.scheduler == "polynomial" or train_config.scheduler == "cosine" or train_config.scheduler ==  "constant":
                 scheduler.step()
    
         else:
         
-            # data (batches) to device   
+            # 将批次数据移至指定设备   
             query = query.to(train_config.device)
             reference = reference.to(train_config.device)
 
-            # Forward pass
+            # 前向传播
             features1, features2 = model(query, reference)
             if torch.cuda.device_count() > 1 and len(train_config.gpu_ids) > 1: 
                 loss = loss_function(features1, features2, model.module.logit_scale.exp())
@@ -76,19 +76,19 @@ def train(train_config, model, dataloader, loss_function, optimizer, scheduler=N
                 loss = loss_function(features1, features2, model.logit_scale.exp()) 
             losses.update(loss.item())
 
-            # Calculate gradient using backward pass
+            # 通过反向传播计算梯度
             loss.backward()
             
-            # Gradient clipping 
+            # 梯度裁剪 
             if train_config.clip_grad:
                 torch.nn.utils.clip_grad_value_(model.parameters(), train_config.clip_grad)                  
             
-            # Update model parameters (weights)
+            # 更新模型参数（权重）
             optimizer.step()
-            # Zero gradients for next step
+            # 清空梯度，为下一步做准备
             optimizer.zero_grad()
             
-            # Scheduler
+            # 学习率调度器
             if train_config.scheduler == "polynomial" or train_config.scheduler == "cosine" or train_config.scheduler ==  "constant":
                 scheduler.step()
         
@@ -114,7 +114,7 @@ def predict(train_config, model, dataloader):
     
     model.eval()
     
-    # wait before starting progress bar
+    # 启动进度条前稍作等待
     time.sleep(0.1)
     
     if train_config.verbose:
@@ -136,14 +136,14 @@ def predict(train_config, model, dataloader):
                 img = img.to(train_config.device)
                 img_feature = model(img)
             
-                # normalize is calculated in fp32
+                # 使用 FP32 计算归一化
                 if train_config.normalize_features:
                     img_feature = F.normalize(img_feature, dim=-1)
             
-            # save features in fp32 for sim calculation
+            # 将特征保存为 FP32，用于相似度计算
             img_features_list.append(img_feature.to(torch.float32))
       
-        # keep Features on GPU
+        # 将特征保留在 GPU 上
         img_features = torch.cat(img_features_list, dim=0) 
         ids_list = torch.cat(ids_list, dim=0).to(train_config.device)
         
