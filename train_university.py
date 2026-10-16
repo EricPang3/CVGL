@@ -5,6 +5,7 @@ import shutil
 import sys
 import torch
 from dataclasses import dataclass
+from pathlib import Path
 from torch.cuda.amp import GradScaler
 from torch.utils.data import DataLoader
 from transformers import get_constant_schedule_with_warmup, get_polynomial_decay_schedule_with_warmup, get_cosine_schedule_with_warmup
@@ -91,15 +92,15 @@ class Configuration:
 config = Configuration() 
 
 if config.dataset == 'U1652-D2S':
-    config.query_folder_train = './data/U1652/train/satellite'
-    config.gallery_folder_train = './data/U1652/train/drone'   
-    config.query_folder_test = './data/U1652/test/query_drone' 
-    config.gallery_folder_test = './data/U1652/test/gallery_satellite'    
+    config.query_folder_train = os.path.join(config.data_folder, 'train', 'satellite')
+    config.gallery_folder_train = os.path.join(config.data_folder, 'train', 'drone')
+    config.query_folder_test = os.path.join(config.data_folder, 'test', 'query_drone')
+    config.gallery_folder_test = os.path.join(config.data_folder, 'test', 'gallery_satellite')
 elif config.dataset == 'U1652-S2D':
-    config.query_folder_train = './data/U1652/train/satellite'
-    config.gallery_folder_train = './data/U1652/train/drone'    
-    config.query_folder_test = './data/U1652/test/query_satellite'
-    config.gallery_folder_test = './data/U1652/test/gallery_drone'
+    config.query_folder_train = os.path.join(config.data_folder, 'train', 'satellite')
+    config.gallery_folder_train = os.path.join(config.data_folder, 'train', 'drone')
+    config.query_folder_test = os.path.join(config.data_folder, 'test', 'query_satellite')
+    config.gallery_folder_test = os.path.join(config.data_folder, 'test', 'gallery_drone')
 
 
 if __name__ == '__main__':
@@ -110,7 +111,7 @@ if __name__ == '__main__':
 
     if not os.path.exists(model_path):
         os.makedirs(model_path)
-    shutil.copyfile(os.path.basename(__file__), "{}/train.py".format(model_path))
+    shutil.copyfile(Path(__file__).resolve(), "{}/train.py".format(model_path))
 
     # 将打印输出同时写入控制台和日志文件
     sys.stdout = Logger(os.path.join(model_path, 'log.txt'))

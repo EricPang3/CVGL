@@ -45,15 +45,15 @@ class Configuration:
 config = Configuration() 
 
 if config.dataset == 'U1652-D2S':
-    config.query_folder_train = './data/U1652/train/satellite'
-    config.gallery_folder_train = './data/U1652/train/drone'   
-    config.query_folder_test = './data/U1652/test/query_drone' 
-    config.gallery_folder_test = './data/U1652/test/gallery_satellite'    
+    config.query_folder_train = os.path.join(config.data_folder, 'train', 'satellite')
+    config.gallery_folder_train = os.path.join(config.data_folder, 'train', 'drone')
+    config.query_folder_test = os.path.join(config.data_folder, 'test', 'query_drone')
+    config.gallery_folder_test = os.path.join(config.data_folder, 'test', 'gallery_satellite')
 elif config.dataset == 'U1652-S2D':
-    config.query_folder_train = './data/U1652/train/satellite'
-    config.gallery_folder_train = './data/U1652/train/drone'    
-    config.query_folder_test = './data/U1652/test/query_satellite'
-    config.gallery_folder_test = './data/U1652/test/gallery_drone'
+    config.query_folder_train = os.path.join(config.data_folder, 'train', 'satellite')
+    config.gallery_folder_train = os.path.join(config.data_folder, 'train', 'drone')
+    config.query_folder_test = os.path.join(config.data_folder, 'test', 'query_satellite')
+    config.gallery_folder_test = os.path.join(config.data_folder, 'test', 'gallery_drone')
 
 
 if __name__ == '__main__':
