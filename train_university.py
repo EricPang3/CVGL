@@ -31,9 +31,9 @@ class Configuration:
     custom_sampling: bool = True         # 自定义采样，保证同一批次地点编号不重复
     seed = 1
     epochs: int = 1
-    batch_size: int = 128                # 注意实际批量大小 real_batch_size = 2 * batch_size
+    batch_size: int = 24                # 注意实际批量大小 real_batch_size = 2 * batch_size
     verbose: bool = True                 # 开启详细输出，False 时会关闭显示
-    gpu_ids: tuple = (0,1,2,3)           # 用于训练的 GPU 编号
+    gpu_ids: tuple = (0,)           # 用于训练的 GPU 编号
     
     # 评估
     batch_size_eval: int = 128
