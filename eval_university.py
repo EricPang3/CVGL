@@ -1,4 +1,5 @@
 import os
+import argparse
 import torch
 from dataclasses import dataclass
 from torch.utils.data import DataLoader
@@ -10,32 +11,40 @@ from sample4geo.model import TimmModel
 
 @dataclass
 class Configuration:
+    def __init__(self):
+        parser = argparse.ArgumentParser(
+            description='在 University-1652 上评估',
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        )
 
-    # 模型
-    model: str = 'convnext_base.fb_in22k_ft_in1k_384'
-    
-    # 覆盖模型的输入图像尺寸
-    img_size: int = 384
-    
-    # 评估
-    batch_size: int = 128
-    verbose: bool = True
-    gpu_ids: tuple = (0,)
-    normalize_features: bool = True
-    eval_gallery_n: int = -1             # -1 表示使用全部图像，也可指定整数数量
-    
-    # 数据集
-    dataset: str = 'U1652-D2S'           # 无人机到卫星检索（'U1652-D2S'）或卫星到无人机检索（'U1652-S2D'）
-    data_folder: str = "./data/U1652"
-    
-    # 用于初始化模型的检查点
-    checkpoint_start = 'pretrained/university/convnext_base.fb_in22k_ft_in1k_384/weights_e1_0.9515.pth'
-  
-    # 在 Windows 系统上将 num_workers 设为 0
-    num_workers: int = 0 if os.name == 'nt' else 4 
-    
-    # 如果 GPU 可用，则使用 GPU
-    device: str = 'cuda' if torch.cuda.is_available() else 'cpu' 
+        # 模型
+        parser.add_argument('--model', default='convnext_base.fb_in22k_ft_in1k_384', type=str, help='模型名称')
+
+        # 覆盖模型的输入图像尺寸
+        parser.add_argument('--img_size', default=384, type=int, help='输入图像尺寸')
+
+        # 评估
+        parser.add_argument('--batch_size', default=128, type=int, help='评估批量大小')
+        parser.add_argument('--verbose', default=True, action=argparse.BooleanOptionalAction, help='输出详细信息')
+        parser.add_argument('--gpu_ids', default=(0,), type=int, nargs='+', help='GPU 编号列表，例如 --gpu_ids 0 1；单卡设备可用 --device cuda:1 指定')
+        parser.add_argument('--normalize_features', default=True, action=argparse.BooleanOptionalAction, help='评估时对特征归一化')
+        parser.add_argument('--eval_gallery_n', default=-1, type=int, help='gallery 图像数量；-1 使用全部')
+
+        # 数据集
+        parser.add_argument('--dataset', default='U1652-D2S', type=str, choices=('U1652-D2S', 'U1652-S2D'), help='检索任务方向')
+        parser.add_argument('--data_folder', default="./data/U1652", type=str, help='数据集根目录，相对路径从当前工作目录计算')
+
+        # 用于初始化模型的检查点
+        parser.add_argument('--checkpoint_start', default='pretrained/university/convnext_base.fb_in22k_ft_in1k_384/weights_e1_0.9515.pth', type=str, help='要评估的模型权重路径')
+
+        # 在 Windows 系统上将 num_workers 设为 0
+        parser.add_argument('--num_workers', default=0 if os.name == 'nt' else 4, type=int, help='数据加载进程数')
+
+        # 如果 GPU 可用，则使用 GPU
+        parser.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu', type=str, help='运行设备，例如 cuda、cuda:1 或 cpu')
+
+        parser.parse_args(namespace=self)
+        self.gpu_ids = tuple(self.gpu_ids)
     
 
 #-----------------------------------------------------------------------------#

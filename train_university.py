@@ -1,4 +1,5 @@
 import os
+import argparse
 import time
 import math
 import shutil
@@ -18,71 +19,86 @@ from sample4geo.loss import InfoNCE
 from sample4geo.model import TimmModel
 
 
+def optional_float(value):
+    """将命令行浮点数或 None 转换为配置值。"""
+    return None if value.lower() == "none" else float(value)
+
+
 @dataclass
 class Configuration:
-    
-    # 模型
-    model: str = 'convnext_base.fb_in22k_ft_in1k_384'
-    
-    # 模型的输入图像尺寸
-    img_size: int = 384
-    
-    # 训练 
-    mixed_precision: bool = True         # 混合精度
-    custom_sampling: bool = True         # 自定义采样，保证同一批次地点编号不重复
-    seed = 1
-    epochs: int = 1
-    batch_size: int = 24                # 注意实际批量大小 real_batch_size = 2 * batch_size
-    verbose: bool = True                 # 开启详细输出，False 时会关闭显示
-    gpu_ids: tuple = (0,)           # 用于训练的 GPU 编号
-    
-    # 评估
-    batch_size_eval: int = 128
-    eval_every_n_epoch: int = 1          # 每隔 n 个训练轮次进行一次评估
-    normalize_features: bool = True      # 是否对特征进行归一化
-    eval_gallery_n: int = -1             # -1 表示使用全部图像，也可指定整数数量
+    def __init__(self):
+        parser = argparse.ArgumentParser(
+            description='在 University-1652 上训练并评估',
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        )
 
-    # 优化器 
-    clip_grad = 100.                     # 梯度裁剪阈值，不裁剪时设为 None，否则设为浮点数阈值
-    decay_exclue_bias: bool = False      # 是否在权重衰减时排除偏置参数
-    grad_checkpointing: bool = False     # 梯度检查点：是否用额外计算换更少显存占用
-    
-    # 损失函数
-    label_smoothing: float = 0.1         # 标签平滑：将部分概率分配给其他类别，避免过拟合和提高模型的泛化能力。设置为 0 表示不使用标签平滑。
-    
-    # 学习率
-    lr: float = 0.001                    # ViT 使用 1 * 10^-4，CNN 使用 1 * 10^-1
-    scheduler: str = "cosine"            # 可选多项式衰减（"polynomial"）、余弦衰减（"cosine"）、恒定学习率（"constant"）或 None
-    warmup_epochs: int = 0.1
-    lr_end: float = 0.0001               #  仅用于多项式衰减（"polynomial"）
-    
-    # 数据集
-    dataset: str = 'U1652-D2S'           # 任务方向，可选 'U1652-D2S'（无人机到卫星）或 'U1652-S2D'（卫星到无人机）
-    data_folder: str = "./data/U1652"    # 数据集路径
-    
-    # 图像增强
-    prob_flip: float = 0.5              # 同时水平翻转卫星图像和无人机图像的概率
-    
-    # 模型权重的保存路径
-    model_path: str = "./university"
-    
-    # 训练前进行评估
-    zero_shot: bool = False
-    
-    # 初始权重路径
-    checkpoint_start = None
-  
-    # 在 Windows 系统上将 num_workers 设为 0
-    num_workers: int = 0 if os.name == 'nt' else 4 
-    
-    # 如果 GPU 可用，则使用 GPU
-    device: str = 'cuda' if torch.cuda.is_available() else 'cpu' 
-    
-    # 提高运行性能
-    cudnn_benchmark: bool = True
-    
-    # 使 cuDNN 使用确定性算法
-    cudnn_deterministic: bool = False
+        # 模型
+        parser.add_argument('--model', default='convnext_base.fb_in22k_ft_in1k_384', type=str, help='模型名称')
+
+        # 模型的输入图像尺寸
+        parser.add_argument('--img_size', default=384, type=int, help='输入图像尺寸')
+
+        # 训练
+        parser.add_argument('--mixed_precision', default=True, action=argparse.BooleanOptionalAction, help='混合精度训练')
+        parser.add_argument('--custom_sampling', default=True, action=argparse.BooleanOptionalAction, help='每个 batch 内地点不重复的自定义采样')
+        parser.add_argument('--seed', default=1, type=int, help='随机种子')
+        parser.add_argument('--epochs', default=1, type=int, help='训练轮数')
+        parser.add_argument('--batch_size', default=24, type=int, help='批量大小；训练时为图像对数量')
+        parser.add_argument('--verbose', default=True, action=argparse.BooleanOptionalAction, help='输出详细信息')
+        parser.add_argument('--gpu_ids', default=(0,), type=int, nargs='+', help='GPU 编号列表，例如 --gpu_ids 0 1；单卡设备可用 --device cuda:1 指定')
+
+        # 评估
+        parser.add_argument('--batch_size_eval', default=128, type=int, help='评估批量大小')
+        parser.add_argument('--eval_every_n_epoch', default=1, type=int, help='每隔多少轮评估一次')
+        parser.add_argument('--normalize_features', default=True, action=argparse.BooleanOptionalAction, help='评估时对特征归一化')
+        parser.add_argument('--eval_gallery_n', default=-1, type=int, help='gallery 图像数量；-1 使用全部')
+
+        # 优化器
+        parser.add_argument('--clip_grad', default=100., type=optional_float, help='梯度裁剪阈值；None 或 0 关闭')
+        parser.add_argument('--decay_exclue_bias', default=False, action=argparse.BooleanOptionalAction, help='在权重衰减中排除偏置参数')
+        parser.add_argument('--grad_checkpointing', default=False, action=argparse.BooleanOptionalAction, help='启用梯度检查点')
+
+        # 损失函数
+        parser.add_argument('--label_smoothing', default=0.1, type=float, help='标签平滑系数')
+
+        # 学习率
+        parser.add_argument('--lr', default=0.001, type=float, help='学习率')
+        parser.add_argument('--scheduler', default="cosine", type=str.lower, choices=('polynomial', 'cosine', 'constant', 'none'), help='学习率调度器；none 关闭')
+        parser.add_argument('--warmup_epochs', default=0.1, type=float, help='warmup 轮数，可为小数')
+        parser.add_argument('--lr_end', default=0.0001, type=float, help='多项式调度器的最终学习率')
+
+        # 数据集
+        parser.add_argument('--dataset', default='U1652-D2S', type=str, choices=('U1652-D2S', 'U1652-S2D'), help='检索任务方向')
+        parser.add_argument('--data_folder', default="./data/U1652", type=str, help='数据集根目录，相对路径从当前工作目录计算')
+
+        # 图像增强
+        parser.add_argument('--prob_flip', default=0.5, type=float, help='配对图像同时水平翻转的概率')
+
+        # 模型权重的保存路径
+        parser.add_argument('--model_path', default="./university", type=str, help='训练结果保存根目录')
+
+        # 训练前进行评估
+        parser.add_argument('--zero_shot', default=False, action=argparse.BooleanOptionalAction, help='训练前先评估')
+
+        # 初始权重路径
+        parser.add_argument('--checkpoint_start', default=None, type=str, help='初始模型权重路径；训练时不恢复优化器')
+
+        # 在 Windows 系统上将 num_workers 设为 0
+        parser.add_argument('--num_workers', default=0 if os.name == 'nt' else 4, type=int, help='数据加载进程数')
+
+        # 如果 GPU 可用，则使用 GPU
+        parser.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu', type=str, help='运行设备，例如 cuda、cuda:1 或 cpu')
+
+        # 提高运行性能
+        parser.add_argument('--cudnn_benchmark', default=True, action=argparse.BooleanOptionalAction, help='启用 cuDNN benchmark')
+
+        # 使 cuDNN 使用确定性算法
+        parser.add_argument('--cudnn_deterministic', default=False, action=argparse.BooleanOptionalAction, help='使用 cuDNN 确定性算法')
+
+        parser.parse_args(namespace=self)
+        self.gpu_ids = tuple(self.gpu_ids)
+        if self.scheduler == "none":
+            self.scheduler = None
 
 
 #-----------------------------------------------------------------------------#
